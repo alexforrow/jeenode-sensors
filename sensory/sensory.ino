@@ -8,9 +8,10 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 // Customize node information
 #define NODE_ID 2
-#define NODE_NAME "skeleton"
+#define NODE_NAME "operations"
 #define NETWORK_ID 100
-#define INTERVAL 30000
+#define INTERVAL 10000
+#define INFO_FREQUENCY 50
 
 // CONFIG - ONE WIRE
 //#define ONE_WIRE_ENABLED
@@ -31,6 +32,8 @@ int numSensors;
 // Setup DHT
 DHT dht(DHT_PIN, DHT_TYPE);
 boolean dhtEnabled;
+
+unsigned int sequence = 0;
 
 void setup(void)
 {
@@ -58,18 +61,11 @@ void setup(void)
   
   // init for DHT
   dht.begin();
+  sleep(1000);
   dhtEnabled = !isnan(dht.readHumidity());
   
   Serial.print("DHT enabled: ");
   Serial.println(dhtEnabled ? "Yes" : "No");
- 
-  // end inits
-  
-  // send HELO string
-  char sendBuffer[32];
-  // INIT
-  sprintf(sendBuffer, "%s i %d %d %d", NODE_NAME, NODE_ID, numSensors, dhtEnabled);
-  transmitString(sendBuffer);
   
   // sleep
   rf12_sleep(0);                          // Put the RFM12 to sleep
@@ -82,6 +78,10 @@ void loop(void)
   // wakeup
   rf12_sleep(-1);     //wake up RF module
   
+  if (sequence % INFO_FREQUENCY == 0) {
+      transmitInfo();
+  }
+  
   if (numSensors > 0) {
     pinMode(ONE_WIRE_POWER, OUTPUT); // set power pin for DS18B20 to output
     digitalWrite(ONE_WIRE_POWER, HIGH); // turn DS18B20 sensor on
@@ -92,7 +92,6 @@ void loop(void)
     for (int count=0;count < numSensors;count++) {
       sprintf(sensorId, "%d", count);
       transmitValue('t', sensorId, sensors.getTempCByIndex(count));
-      delay(1000);
     }
     
     digitalWrite(ONE_WIRE_POWER, LOW); // turn DS18B20 sensor off
@@ -115,27 +114,41 @@ void loop(void)
   rf12_sleep(0);     // sleep RF module
   
   Sleepy::loseSomeTime(INTERVAL);
+  
+  sequence++;
 }
 
 void transmitValue(char cmd, char* sensorId, float value)
 {
-  char sendBuffer[32];
+  char buffer[32];
   int decimal = (value - (int)value) * 100;
   
   // build string
   // e.g. kitchen t dht 21.3 (kitchen, temperature, dht sensor, 21.3oC)
-  sprintf(sendBuffer, "%s %c %s %0d.%d", NODE_NAME, cmd, sensorId, (int)value, decimal);
-  transmitString(sendBuffer);
+  sprintf(buffer, "%s %0d.%d", sensorId, (int)value, decimal);
+  transmitString(cmd, buffer);
 }
 
-void transmitString(char* data)
+void transmitString(char cmd, char* data)
 {
-  Serial.print("Transmitting: ");
-  Serial.println(data);
+  char sendBuffer[64];
   
-  rf12_sendNow(0, data, strlen(data));
+  sprintf(sendBuffer, "%s %u %c %s", NODE_NAME, sequence, cmd, data);
+  Serial.print("Transmitting: ");
+  Serial.println(sendBuffer);
+  
+  rf12_sendNow(0, sendBuffer, strlen(sendBuffer));
   
   Serial.flush();
   rf12_sendWait(2);
+  
+  // this seems to be needed, otherwise messages get lost
   delay(500);
+}
+
+void transmitInfo()
+{
+  char buffer[32];
+  sprintf(buffer, "%d %d %d", NODE_ID, numSensors, dhtEnabled);
+  transmitString('i', buffer);
 }
