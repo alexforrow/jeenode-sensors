@@ -8,15 +8,15 @@ riemann ||= Riemann::Client.new(
         :port => 5555
       )
 
-def get_state(temp)
+def temperature_state(temp)
 	if temp >= 28
-		state = :hot
+		:hot
 	elsif temp >= 25
-		state = :warm
+		:warm
 	elsif temp >= 21
-		state = :ok
+		:ok
 	else
-		state = :cold
+		:cold
 	end
 end
 
@@ -24,25 +24,65 @@ areas = Hash.new
 
 line_num=0
 File.open('/dev/ttyUSB0').each do |line|
+	event = nil
+
 	print "#{line_num += 1} #{line}"
+
+	# break up line and check it begins with expected string
 	parts = line.split(' ')
 	next unless parts.first and parts.first == 'OK'
-	id = parts[1]
-	temp = parts[2].to_f
 
-	areas[id] = 0 unless areas[id]
+	node = parts[1]
+	cmd = part[2]
 
-	areas[id] = areas[id] + 1
+	case cmd
+	when 'i':
+		# init
+		node_id = parts[3]
+		onewire_sensors = parts[4].to_i
+		dht_enabled = parts[5].to_i
 
-	event = {
-		:host => "environment - #{id}",
-		:service => 'temperature',
-		:metric => temp,
-		:ttl => 300,
-		:state => get_state(temp).to_s
-	}
-	puts event.inspect
-	riemann << event
+		event = {
+			:host => "#{node}",
+			:service => 'init',
+			:metric => onewire_sensors + dht_enabled,
+			:description => "Node #{node} (#{node_id}) init, with #{onewire_sensors} onewire sensors, and #{dht_enabled} DHT sensors"
+		}
+	when 't'
+		# temperature
+		sensor_id = parts[3]
+		temperature = parts[4].to_f
 
-	puts areas.inspect
+		event = {
+			:host => "#{node}:#{sensor_id}",
+			:service => 'temperature',
+			:metric => temperature,
+			:ttl => 300,
+			:state => temperature_state(temp).to_s
+		}
+	when 'h'
+		# humidity
+		sensor_id = parts[3]
+		humidity = parts[4].to_f
+
+		event = {
+			:host => "#{node}:#{sensor_id}",
+			:service => 'humidity',
+			:metric => humidity,
+			:ttl => 300,
+			:state => 'unknown'
+		}
+	else
+		puts "Unknown line: #{line}"
+		event = nil
+	end
+	
+	if event
+		puts event.inspect
+		riemann << event
+	end
+
+	#areas[id] = 0 unless areas[id]
+	#areas[id] = areas[id] + 1
+	#puts areas.inspect
 end

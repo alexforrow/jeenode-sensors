@@ -7,8 +7,8 @@
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 // Customize node information
-#define NODE_ID 10
-#define NODE_NAME "ops"
+#define NODE_ID 2
+#define NODE_NAME "skeleton"
 #define NETWORK_ID 100
 #define INTERVAL 30000
 
@@ -21,6 +21,7 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 #define DHT_ENABLED
 #define DHT_PIN 4
 #define DHT_TYPE DHT22   // DHT 22  (AM2302)
+#define DHT_TAG "dht"
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs) and tie in Dallas
 OneWire oneWire(ONE_WIRE_BUS);
@@ -66,7 +67,8 @@ void setup(void)
   
   // send HELO string
   char sendBuffer[32];
-  sprintf(sendBuffer, "HELO %s %d %d %d", NODE_NAME, NODE_ID, numSensors, dhtEnabled);
+  // INIT
+  sprintf(sendBuffer, "%s i %d %d %d", NODE_NAME, NODE_ID, numSensors, dhtEnabled);
   transmitString(sendBuffer);
   
   // sleep
@@ -88,8 +90,8 @@ void loop(void)
     
     sensors.requestTemperatures(); // Send the command to get temperatures
     for (int count=0;count < numSensors;count++) {
-      sprintf(sensorId, "%s-%d", NODE_NAME, count);
-      transmitValue(sensorId, sensors.getTempCByIndex(count));
+      sprintf(sensorId, "%d", count);
+      transmitValue('t', sensorId, sensors.getTempCByIndex(count));
       delay(1000);
     }
     
@@ -104,10 +106,8 @@ void loop(void)
     if (isnan(humidity) || isnan(temperature)) {
       Serial.println("Failed to read from DHT");
     } else {
-      sprintf(sensorId, "%s-dht", NODE_NAME);
-      transmitValue(sensorId, temperature);
-      sprintf(sensorId, "%s-dht.h", NODE_NAME);
-      transmitValue(sensorId, humidity);
+      transmitValue('t', "dht", temperature);
+      transmitValue('h', "dht", humidity);
     }
   }
   
@@ -117,13 +117,14 @@ void loop(void)
   Sleepy::loseSomeTime(INTERVAL);
 }
 
-void transmitValue(char* sensorId, float value)
+void transmitValue(char cmd, char* sensorId, float value)
 {
   char sendBuffer[32];
   int decimal = (value - (int)value) * 100;
   
   // build string
-  sprintf(sendBuffer, "%s %0d.%d", sensorId, (int)value, decimal);
+  // e.g. kitchen t dht 21.3 (kitchen, temperature, dht sensor, 21.3oC)
+  sprintf(sendBuffer, "%s %c %s %0d.%d", NODE_NAME, cmd, sensorId, (int)value, decimal);
   transmitString(sendBuffer);
 }
 
