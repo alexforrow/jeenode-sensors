@@ -33,10 +33,10 @@ File.open('/dev/ttyUSB0').each do |line|
 	next unless parts.first and parts.first == 'OK'
 
 	node = parts[1]
-	cmd = part[2]
+	cmd = parts[2]
 
 	case cmd
-	when 'i':
+	when 'i'
 		# init
 		node_id = parts[3]
 		onewire_sensors = parts[4].to_i
@@ -58,7 +58,7 @@ File.open('/dev/ttyUSB0').each do |line|
 			:service => 'temperature',
 			:metric => temperature,
 			:ttl => 300,
-			:state => temperature_state(temp).to_s
+			:state => temperature_state(temperature).to_s
 		}
 	when 'h'
 		# humidity
