@@ -30,28 +30,29 @@ File.open('/dev/ttyUSB0').each do |line|
 
 	# break up line and check it begins with expected string
 	parts = line.split(' ')
-	next unless parts.first and parts.first == 'OK'
+	next unless parts.first and parts.shift == 'OK'
 
-	node = parts[1]
-	cmd = parts[2]
+	node = parts.shift
+	sequence = parts.shift
+	cmd = parts.shift
 
 	case cmd
 	when 'i'
-		# init
-		node_id = parts[3]
-		onewire_sensors = parts[4].to_i
-		dht_enabled = parts[5].to_i
+		# info
+		node_id = parts.shift
+		onewire_sensors = parts.shift.to_i
+		dht_enabled = parts.shift.to_i
 
 		event = {
 			:host => "#{node}",
-			:service => 'init',
+			:service => 'info',
 			:metric => onewire_sensors + dht_enabled,
-			:description => "Node #{node} (#{node_id}) init, with #{onewire_sensors} onewire sensors, and #{dht_enabled} DHT sensors"
+			:description => "Node #{node} (#{node_id}) info, with #{onewire_sensors} onewire sensors, and #{dht_enabled} DHT sensors"
 		}
 	when 't'
 		# temperature
-		sensor_id = parts[3]
-		temperature = parts[4].to_f
+		sensor_id = parts.shift
+		temperature = parts.shift.to_f
 
 		event = {
 			:host => "#{node}:#{sensor_id}",
@@ -62,8 +63,8 @@ File.open('/dev/ttyUSB0').each do |line|
 		}
 	when 'h'
 		# humidity
-		sensor_id = parts[3]
-		humidity = parts[4].to_f
+		sensor_id = parts.shift
+		humidity = parts.shift.to_f
 
 		event = {
 			:host => "#{node}:#{sensor_id}",
