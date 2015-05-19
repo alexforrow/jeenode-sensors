@@ -7,10 +7,10 @@
 ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 // Customize node information
-#define NODE_ID 2
-#define NODE_NAME "operations"
+#define NODE_ID 3
+#define NODE_NAME "garage"
 #define NETWORK_ID 100
-#define INTERVAL 10000
+#define INTERVAL_MIN 1
 #define INFO_FREQUENCY 50
 
 // CONFIG - ONE WIRE
@@ -35,8 +35,7 @@ boolean dhtEnabled;
 
 unsigned int sequence = 0;
 
-void setup(void)
-{
+void setup(void) {
   // start serial port
   Serial.begin(57600);
   Serial.println("AF jeenode sensory node");
@@ -61,7 +60,7 @@ void setup(void)
   
   // init for DHT
   dht.begin();
-  sleep(1000);
+  delay(1000);
   dhtEnabled = !isnan(dht.readHumidity());
   
   Serial.print("DHT enabled: ");
@@ -71,8 +70,7 @@ void setup(void)
   rf12_sleep(0);                          // Put the RFM12 to sleep
 }
 
-void loop(void)
-{
+void loop(void) {
   char sensorId[32];
   
   // wakeup
@@ -113,15 +111,20 @@ void loop(void)
   // go to sleep
   rf12_sleep(0);     // sleep RF module
   
-  Sleepy::loseSomeTime(INTERVAL);
+  for (byte i = 0; i < INTERVAL_MIN; ++i)
+    Sleepy::loseSomeTime(60000);
   
   sequence++;
 }
 
-void transmitValue(char cmd, char* sensorId, float value)
-{
+void transmitValue(char cmd, char* sensorId, float value) {
   char buffer[32];
+
+  // quick and nasty way of converting float to string
   int decimal = (value - (int)value) * 100;
+  if (decimal < 0) {
+    decimal = -decimal;
+  }
   
   // build string
   // e.g. kitchen t dht 21.3 (kitchen, temperature, dht sensor, 21.3oC)
@@ -129,8 +132,7 @@ void transmitValue(char cmd, char* sensorId, float value)
   transmitString(cmd, buffer);
 }
 
-void transmitString(char cmd, char* data)
-{
+void transmitString(char cmd, char* data) {
   char sendBuffer[64];
   
   sprintf(sendBuffer, "%s %u %c %s", NODE_NAME, sequence, cmd, data);
@@ -146,8 +148,7 @@ void transmitString(char cmd, char* data)
   delay(500);
 }
 
-void transmitInfo()
-{
+void transmitInfo() {
   char buffer[32];
   sprintf(buffer, "%d %d %d", NODE_ID, numSensors, dhtEnabled);
   transmitString('i', buffer);
