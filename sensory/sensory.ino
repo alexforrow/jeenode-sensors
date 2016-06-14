@@ -8,9 +8,9 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 
 // Customize node information
 #define NODE_ID 3
-#define NODE_NAME "garage"
+#define NODE_NAME "my_first_sensor"
 #define NETWORK_ID 100
-#define INTERVAL_MIN 1
+#define INTERVAL_MIN 10
 #define INFO_FREQUENCY 50
 
 // CONFIG - ONE WIRE
@@ -21,6 +21,7 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 // CONFIG - DHT22
 #define DHT_ENABLED
 #define DHT_PIN 4
+#define DHT_POWER A0
 #define DHT_TYPE DHT22   // DHT 22  (AM2302)
 #define DHT_TAG "dht"
 
@@ -59,6 +60,8 @@ void setup(void) {
   Serial.println(numSensors);
   
   // init for DHT
+  pinMode(DHT_POWER, OUTPUT); // set power pin for DHT to output
+  digitalWrite(DHT_POWER, HIGH); // turn DHT sensor on
   dht.begin();
   delay(1000);
   dhtEnabled = !isnan(dht.readHumidity());
@@ -97,6 +100,11 @@ void loop(void) {
   }
   
   if (dhtEnabled) {
+    pinMode(DHT_POWER, OUTPUT); // set power pin for DHT to output
+    digitalWrite(DHT_POWER, HIGH); // turn DHT sensor on
+    dht.begin();
+    delay(1000);
+
     float humidity = dht.readHumidity();
     float temperature = dht.readTemperature();
     
@@ -106,6 +114,9 @@ void loop(void) {
       transmitValue('t', "dht", temperature);
       transmitValue('h', "dht", humidity);
     }
+
+    digitalWrite(DHT_POWER, LOW); // turn DHT sensor off
+    pinMode(DHT_POWER, INPUT); // set power pin for DHT to input before sleeping, saves power
   }
   
   // go to sleep
