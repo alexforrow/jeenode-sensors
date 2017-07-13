@@ -25,6 +25,11 @@ ISR(WDT_vect) { Sleepy::watchdogEvent(); }
 #define DHT_TYPE DHT22   // DHT 22  (AM2302)
 #define DHT_TAG "dht"
 
+// CONFIG - Capacitive moisture sensor https://www.dfrobot.com/wiki/index.php/Capacitive_Soil_Moisture_Sensor_SKU:SEN0193
+//#define MOISTURE_ENABLED
+#define MOISTURE_PIN A2
+#define MOISTURE_POWER 6
+
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs) and tie in Dallas
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -33,6 +38,7 @@ int numSensors;
 // Setup DHT
 DHT dht(DHT_PIN, DHT_TYPE);
 boolean dhtEnabled;
+boolean moistureEnabled = false;
 
 unsigned int sequence = 0;
 
@@ -68,6 +74,15 @@ void setup(void) {
   
   Serial.print("DHT enabled: ");
   Serial.println(dhtEnabled ? "Yes" : "No");
+
+  Serial.print("Moisture reading: ");
+  #ifdef MOISTURE_ENABLED
+  Serial.println("Enabled");
+  moistureEnabled = true;
+  #endif
+  #ifndef MOISTURE_ENABLED
+  Serial.println("Disabled");
+  #endif
   
   // sleep
   rf12_sleep(0);                          // Put the RFM12 to sleep
@@ -118,6 +133,19 @@ void loop(void) {
     digitalWrite(DHT_POWER, LOW); // turn DHT sensor off
     pinMode(DHT_POWER, INPUT); // set power pin for DHT to input before sleeping, saves power
   }
+
+  #ifdef MOISTURE_ENABLED
+  pinMode(MOISTURE_POWER, OUTPUT);
+  digitalWrite(MOISTURE_POWER, HIGH);
+
+  delay(200);
+
+  int moisture = analogRead(MOISTURE_PIN);
+  transmitValue('m', "0", moisture);
+
+  digitalWrite(MOISTURE_POWER, LOW);
+  pinMode(MOISTURE_POWER, INPUT);
+  #endif
   
   // go to sleep
   rf12_sleep(0);     // sleep RF module
@@ -161,6 +189,6 @@ void transmitString(char cmd, char* data) {
 
 void transmitInfo() {
   char buffer[32];
-  sprintf(buffer, "%d %d %d", NODE_ID, numSensors, dhtEnabled);
+  sprintf(buffer, "%d %d %d %d", NODE_ID, numSensors, dhtEnabled, moistureEnabled);
   transmitString('i', buffer);
 }
